@@ -21,7 +21,8 @@ async function setupSchema(client: ReturnType<typeof createClient>) {
       id TEXT PRIMARY KEY,
       sub TEXT NOT NULL UNIQUE,
       caps INTEGER NOT NULL DEFAULT 0,
-      onboarded INTEGER NOT NULL DEFAULT 0
+      onboarded INTEGER NOT NULL DEFAULT 0,
+      headscale_user_id TEXT
     )
   `);
 }

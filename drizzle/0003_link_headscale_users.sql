@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN headscale_user_id TEXT;

@@ -59,9 +59,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       claims.sub,
     );
 
-    // We have defaults that closely follow what Headscale uses, maybe we
-    // can make it configurable in the future, but for now we only need the
-    // `sub` claim.
     const username = userInfo.preferred_username ?? userInfo.email?.split("@")[0] ?? "user";
     const name =
       userInfo.name ??
@@ -87,14 +84,29 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       .from(users)
       .where(eq(users.caps, Roles.owner));
 
+    // Match OIDC subject to Headscale user providerId
+    let headscaleUserId: string | undefined;
+    if (context.config.oidc?.integrate_headscale) {
+      headscaleUserId = await findHeadscaleUser(context, oidcConnector.apiKey, claims.sub);
+    }
+
     await context.db
       .insert(users)
       .values({
         id: ulid(),
         sub: claims.sub,
         caps: userCount === 0 ? Roles.owner : Roles.member,
+        headscale_user_id: headscaleUserId,
       })
       .onConflictDoNothing();
+
+    // Update existing user with Headscale link if not set
+    if (headscaleUserId) {
+      await context.db
+        .update(users)
+        .set({ headscale_user_id: headscaleUserId })
+        .where(eq(users.sub, claims.sub));
+    }
 
     return redirect("/", {
       headers: {
@@ -152,4 +164,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
     return redirect("/login?s=error_auth_failed");
   }
+}
+
+async function findHeadscaleUser(
+  context: Route.LoaderArgs["context"],
+  apiKey: string,
+  subject: string,
+): Promise<string | undefined> {
+  try {
+    const api = context.hsApi.getRuntimeClient(apiKey);
+    const hsUsers = await api.getUsers();
+
+    for (const user of hsUsers) {
+      // providerId format is "oidc/subject123"
+      const userSubject = user.providerId?.split("/").pop();
+      if (userSubject === subject) {
+        log.info("auth", "Linked to Headscale user %s", user.id);
+        return user.id;
+      }
+    }
+  } catch (err) {
+    log.debug("auth", "Failed to query Headscale users: %o", err);
+  }
+  return undefined;
 }

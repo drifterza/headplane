@@ -71,6 +71,7 @@ const oidcConfig = type({
   client_secret: "string",
   headscale_api_key: "string",
   use_pkce: "boolean = false",
+  integrate_headscale: "boolean = false",
   redirect_uri: type("string.url")
     .pipe((value, ctx) => {
       log.warn("config", "%s is deprecated and will be removed in 0.7.0", ctx.propString);
@@ -111,6 +112,7 @@ const partialOidcConfig = type({
   client_secret: "string?",
   use_pkce: "boolean?",
   headscale_api_key: "string?",
+  integrate_headscale: "boolean?",
   redirect_uri: "string.url?",
   disable_api_key_login: "boolean?",
   scope: "string?",
